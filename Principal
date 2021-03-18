@@ -1,93 +1,1417 @@
-Version1
-#Proyecto
-# libreirias
-import os
-import qrcode
-import time
-from telegram.ext import  Updater, CommandHandler, ConversationHandler,CallbackQueryHandler, MessageHandler, Filters
-from telegram import ChatAction, InlineKeyboardMarkup, InlineKeyboardButton
+"""
+Version 2
+"""
+import logging
+
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext
 from random import randint, randrange
 from time import sleep 
-###########################
-# Constantes del programa
-INPUT_TEXT =0
-VUELO = [0,0,0,0,0,0,0,0,0,0,0,0]
+from datetime import date
+from datetime import datetime
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+##########################################
 
-###########################
-#Funcion para el comando /start
-def start(update, context):                     #metodo que envia un mensaje cuando inicia el bot con el comando (/start).
-  update.message.reply_text(text='Bienvenid@! Para reservar su vuelo elija una de esta opciones: ', 
-                            reply_markup=InlineKeyboardMarkup([
-                                                               [InlineKeyboardButton(text='Listar vuelos disponibles', callback_data='list')], #Crea el btn1
-                                                               [InlineKeyboardButton(text='Buscar vuelo por origen y destino', callback_data='search')], 
-                                                               ])) #Crea el btn2  # Devuelve esta respuesta. Añade uno a debajo del otro
+#VIAJE= [0,0,0,0,0,0,0,0,0,0,0,0]
+VIAJE= [0,0]
+##########################################
+def start(update: Update, _: CallbackContext) -> None:
+  
+    keyboard = [
+                [InlineKeyboardButton("Listar vuelos disponibles", callback_data='listar'),
+                InlineKeyboardButton("Buscar vuelo por origen y destino", callback_data='buscar'),],
+              [InlineKeyboardButton("Finalizar", callback_data='finalizar')],
+    ]
+  
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    update.message.reply_text('Bienvenid@! Por favor elija una opcion:', reply_markup=reply_markup) 
+          
+##########################################
+def help_command(update: Update, _: CallbackContext) -> None:
+    update.message.reply_text("Usa /start para iniciar la reserva.")
 
-###########################
-#Funcion para el boton Search 
-def btnBuscar(update, context): 
-  query=update.callback_query
-  query.answer()
-  query.edit_message_text(                        # Edita los botones que ya fueron creados y borra la informacion anterior
-      text ='Elija unas de las siguintes opciones',
-      reply_markup=InlineKeyboardMarkup([
-                                         [InlineKeyboardButton(text='Reservar vuelo solo ida', callback_data='buyT'),#Crea el btn1 de Buscar
-                                          InlineKeyboardButton(text='Reservar vuelo ida y vuelta', callback_data='buyRT')], #Crea el btn2 Buscar
-                                         [InlineKeyboardButton(text='Regresar', callback_data='return') ], #Crea el btn3 de Buscar
+##########################################
+def button(update: Update, _: CallbackContext) -> None:
+    text ='Elija unas de las sigueintes opciones'
+    #auxDestino =[0,0]       #[Continente] 
+    auxAfrica = [' ', ' ', ' ', ' ']
+    auxAmerica = [' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' '] 
+    auxAsia = [' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ']  
+    auxEuropa = [' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ']
+    auxOceania = [' ',' ']
+    auxNacional =  [' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' ',' '] 
+    auxFechaI = [0,0,0]
+    auxFechaF = [5000,0,0]
+    today = date.today()
+                            #asientos,costo
+    auxBoleto = ['origen','destino',0,0,'Fecha i','Fecha r','nombre','cedula','cuenta bancaria']
+    query = update.callback_query
+    # recupera la informacion
+    query.answer()
+    #Toma la informacion del boton
+    choose = query.data
+    
+    #Compara los valores del boton
+    if choose == 'listar': # primero elegir el aeropuerto
+      query.edit_message_text("Donde desea verificar vuelos dispoonibles", reply_markup=InlineKeyboardMarkup([
+                                              [InlineKeyboardButton('Guayas, Ecuador', callback_data='Guayas')],
+                                              [InlineKeyboardButton('Quito, Ecuador', callback_data='Quito')],
+                                              [InlineKeyboardButton("Regresar", callback_data='regresar') ],
                                         ]))
-  return INPUT_TEXT                               #Hace que espere alguna respuesta
+    if choose == 'Guayas':  
+      query.edit_message_text("(Guayas) Elija el continente:", reply_markup=InlineKeyboardMarkup([
+                                              [InlineKeyboardButton('Africa', callback_data='gAfrica')],
+                                              [InlineKeyboardButton("America", callback_data='gAmerica') ],
+                                              [InlineKeyboardButton("Asia", callback_data='gAsia') ],
+                                              [InlineKeyboardButton("Europa", callback_data='gEuropa') ],
+                                              [InlineKeyboardButton("Oceanía", callback_data='gOceania') ],
+                                              [InlineKeyboardButton("Nacionales", callback_data='gNacional') ],
+                                              [InlineKeyboardButton("Regresar", callback_data='listar') ],
+                                        ]))
+    if choose == 'Quito': 
+      query.edit_message_text("(Quito) Elija el continente:", reply_markup=InlineKeyboardMarkup([
+                                              [InlineKeyboardButton('Africa', callback_data='qAfrica')],
+                                              [InlineKeyboardButton("America", callback_data='qAmerica') ],
+                                              [InlineKeyboardButton("Asia", callback_data='qAsia') ],
+                                              [InlineKeyboardButton("Europa", callback_data='qEuropa') ],
+                                              [InlineKeyboardButton("Oceanía", callback_data='qOceania') ],
+                                              [InlineKeyboardButton("Nacionales", callback_data='gNacional') ],
+                                              [InlineKeyboardButton("Regresar", callback_data='listar') ],
+                                        ]))  
+##########################################
+    if choose == 'gAfrica':
+      for x in range(0,4):
+      # VIAJE[0] son los vuelos que tiene guayas,  verifica si tiene o no tiene cupo
+        if  VIAJE[0].destino.lista[x][1]>0:
+          auxAfrica[x]=VIAJE[0].destino.lista[x][0] +", Cupos: "+str(VIAJE[0].destino.lista[x][1]) + ", Precio(unid):$ "+str(VIAJE[0].destino.lista[x][2])
+        else:
+          auxAfrica[x]=VIAJE[0].destino.lista[x][0]+ ", Agotado" 
+      # Creo los botones , sin nunguna direccion porque solo es para verificar
+      query.edit_message_text("(Guayas-Africa) En el Aeropuerto Jose Joaquin Olmedo esta disponible los siguientes vuelos:", 
+                              reply_markup=InlineKeyboardMarkup([ 
+                                                                  [InlineKeyboardButton(auxAfrica[0], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxAfrica[1], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxAfrica[2], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxAfrica[3], callback_data='null')],  
+                                                                  [InlineKeyboardButton("Regresar", callback_data='Guayas')],
+                                                                 ]))
+    if choose == 'qAfrica':
+      for x in range(0,4):
+      # VIAJE[1] son los vuelos que tiene guayas,  verifica si tiene o no tiene cupo
+        if  VIAJE[1].destino.lista[x][1]>0:
+          auxAfrica[x]=VIAJE[1].destino.lista[x][0] +", Cupos: "+str(VIAJE[1].destino.lista[x][1]) + ", Precio(unid):$ "+str(VIAJE[1].destino.lista[x][2])
+        else:
+          auxAfrica[x]=VIAJE[1].destino.lista[x][0]+ ", Agotado" 
+      # Creo los botones , sin nunguna direccion porque solo es para verificar
+      query.edit_message_text("(Quito-Africa) En el Aeropuerto Mariscal de Sucre esta disponible los siguientes vuelos:", 
+                              reply_markup=InlineKeyboardMarkup([ 
+                                                                  [InlineKeyboardButton(auxAfrica[0], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxAfrica[1], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxAfrica[2], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxAfrica[3], callback_data='null')],  
+                                                                  [InlineKeyboardButton("Regresar", callback_data='Quito')],
+                                                                 ]))
+##########################################
+    if choose == 'gAmerica':
+      for x in range(4,28):
+      # VIAJE[0] son los vuelos que tiene guayas,  verifica si tiene o no tiene cupo
+        if  VIAJE[0].destino.lista[x][1]>0: # lista[x][1] es el numero de asiento de vuelo
+          auxAmerica[x-4]=VIAJE[0].destino.lista[x][0] +", Cupos: "+str(VIAJE[0].destino.lista[x][1]) + ", Precio(unid):$ "+str(VIAJE[0].destino.lista[x][2])
+        else:
+          auxAmerica[x-4]=VIAJE[0].destino.lista[x][0]+ ", Agotado" 
+      # Creo los botones , sin nunguna direccion porque solo es para verificar
+      query.edit_message_text("(Guayas- America) En el Aeropuerto Jose Joaquin Olmedo esta disponible los siguientes vuelos:", 
+                              reply_markup=InlineKeyboardMarkup([ 
+                                                                  [InlineKeyboardButton(auxAmerica[0], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxAmerica[1], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxAmerica[2], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxAmerica[3], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxAmerica[4], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAmerica[5], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAmerica[6], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAmerica[7], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAmerica[9], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxAmerica[10], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAmerica[11], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAmerica[12], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAmerica[13], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAmerica[14], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAmerica[15], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAmerica[16], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAmerica[17], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAmerica[18], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxAmerica[19], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAmerica[20], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAmerica[21], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAmerica[22], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAmerica[23], callback_data='null')],
+                                                                  [InlineKeyboardButton("Regresar", callback_data='Guayas')],
+                                                                 ]))
+    if choose == 'qAmerica':
+      for x in range(4,28):
+      # VIAJE[1] son los vuelos que tiene guayas,  verifica si tiene o no tiene cupo
+        if  VIAJE[1].destino.lista[x][1]>0:
+          auxAmerica[x-4]=VIAJE[1].destino.lista[x][0] +", Cupos: "+str(VIAJE[1].destino.lista[x][1]) + ", Precio(unid):$ "+str(VIAJE[1].destino.lista[x][2])
+        else:
+          auxAmerica[x-4]=VIAJE[1].destino.lista[x][0]+ ", Agotado" 
+      # Creo los botones , sin nunguna direccion porque solo es para verificar
+      query.edit_message_text("(Quito- America) En el Aeropuerto Mariscal de Sucre esta disponible los siguientes vuelos:", 
+                              reply_markup=InlineKeyboardMarkup([ 
+                                                                  [InlineKeyboardButton(auxAmerica[0], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxAmerica[1], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxAmerica[2], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxAmerica[3], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxAmerica[4], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAmerica[5], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAmerica[6], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAmerica[7], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAmerica[9], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxAmerica[10], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAmerica[11], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAmerica[12], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAmerica[13], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAmerica[14], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAmerica[15], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAmerica[16], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAmerica[17], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAmerica[18], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxAmerica[19], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAmerica[20], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAmerica[21], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAmerica[22], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAmerica[23], callback_data='null')],
+                                                                  [InlineKeyboardButton("Regresar", callback_data='Quito')],
+                                                                 ]))
+##########################################
+    if choose == 'gAsia':
+      for x in range(28,42):
+      # VIAJE[0] son los vuelos que tiene guayas,  verifica si tiene o no tiene cupo
+        if  VIAJE[0].destino.lista[x][1]>0: # lista[x][1] es el numero de asiento de vuelo
+          auxAsia[x-28]=VIAJE[0].destino.lista[x][0] +", Cupos: "+str(VIAJE[0].destino.lista[x][1]) + ", Precio(unid):$ "+str(VIAJE[0].destino.lista[x][2])
+        else:
+          auxAsia[x-28]=VIAJE[0].destino.lista[x][0]+ ", Agotado" 
+      # Creo los botones , sin nunguna direccion porque solo es para verificar
+      query.edit_message_text("(Guayas- Asia) En el Aeropuerto Jose Joaquin Olmedo esta disponible los siguientes vuelos:", 
+                              reply_markup=InlineKeyboardMarkup([ 
+                                                                  [InlineKeyboardButton(auxAsia[0], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxAsia[1], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxAsia[2], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxAsia[3], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxAsia[4], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAsia[5], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAsia[6], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAsia[7], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAsia[9], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxAsia[10], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAsia[11], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAsia[12], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAsia[13], callback_data='null')], 
+                                                                  [InlineKeyboardButton("Regresar", callback_data='Guayas')],
+                                                                 ]))
+    if choose == 'qAsia':
+      for x in range(28,42):
+      # VIAJE[1] son los vuelos que tiene guayas,  verifica si tiene o no tiene cupo
+        if  VIAJE[1].destino.lista[x][1]>0:
+          auxAsia[x-28]=VIAJE[1].destino.lista[x][0] +", Cupos: "+str(VIAJE[1].destino.lista[x][1]) + ", Precio(unid):$ "+str(VIAJE[1].destino.lista[x][2])
+        else:
+          auxAsia[x-28]=VIAJE[1].destino.lista[x][0]+ ", Agotado" 
+      # Creo los botones , sin nunguna direccion porque solo es para verificar
+      query.edit_message_text("(Quito-Asia) En el Aeropuerto Mariscal de Sucre esta disponible los siguientes vuelos:", 
+                              reply_markup=InlineKeyboardMarkup([ 
+                                                                  [InlineKeyboardButton(auxAsia[0], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxAsia[1], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxAsia[2], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxAsia[3], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxAsia[4], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAsia[5], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAsia[6], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAsia[7], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAsia[9], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxAsia[10], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAsia[11], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAsia[12], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxAsia[13], callback_data='null')], 
+                                                                  [InlineKeyboardButton("Regresar", callback_data='Quito')],
+                                                                 ]))
+##########################################
+    if choose == 'gEuropa':
+      for x in range(42,55):
+      # VIAJE[0] son los vuelos que tiene guayas,  verifica si tiene o no tiene cupo
+        if  VIAJE[0].destino.lista[x][1]>0: # lista[x][1] es el numero de asiento de vuelo
+          auxEuropa[x-42]=VIAJE[0].destino.lista[x][0] +", Cupos: "+str(VIAJE[0].destino.lista[x][1]) + ", Precio(unid):$ "+str(VIAJE[0].destino.lista[x][2])
+        else:
+          auxEuropa[x-42]=VIAJE[0].destino.lista[x][0]+ ", Agotado" 
+      # Creo los botones , sin nunguna direccion porque solo es para verificar
+      query.edit_message_text("(Guayas- Europa) En el Aeropuerto Jose Joaquin Olmedo esta disponible los siguientes vuelos:", 
+                              reply_markup=InlineKeyboardMarkup([ 
+                                                                  [InlineKeyboardButton(auxEuropa[0], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxEuropa[1], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxEuropa[2], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxEuropa[3], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxEuropa[4], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxEuropa[5], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxEuropa[6], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxEuropa[7], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxEuropa[9], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxEuropa[10], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxEuropa[11], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxEuropa[12], callback_data='null')], 
+                                                                  [InlineKeyboardButton("Regresar", callback_data='Guayas')],
+                                                                 ]))
+    if choose == 'qEuropa':
+      for x in range(42,55):
+      # VIAJE[1] son los vuelos que tiene guayas,  verifica si tiene o no tiene cupo
+        if  VIAJE[1].destino.lista[x][1]>0:
+          auxEuropa[x-42]=VIAJE[1].destino.lista[x][0] +", Cupos: "+str(VIAJE[1].destino.lista[x][1]) + ", Precio(unid):$ "+str(VIAJE[1].destino.lista[x][2])
+        else:
+          auxEuropa[x-42]=VIAJE[1].destino.lista[x][0]+ ", Agotado" 
+      # Creo los botones , sin nunguna direccion porque solo es para verificar
+      query.edit_message_text("(Quito- Europa) En el Aeropuerto Mariscal de Sucre esta disponible los siguientes vuelos:", 
+                              reply_markup=InlineKeyboardMarkup([ 
+                                                                  [InlineKeyboardButton(auxEuropa[0], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxEuropa[1], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxEuropa[2], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxEuropa[3], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxEuropa[4], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxEuropa[5], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxEuropa[6], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxEuropa[7], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxEuropa[9], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxEuropa[10], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxEuropa[11], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxEuropa[12], callback_data='null')], 
+                                                                  [InlineKeyboardButton("Regresar", callback_data='Quito')],
+                                                                 ]))
+##########################################
+    if choose == 'gOceania':
+      for x in range(55,57):
+      # VIAJE[0] son los vuelos que tiene guayas,  verifica si tiene o no tiene cupo
+        if  VIAJE[0].destino.lista[x][1]>0: # lista[x][1] es el numero de asiento de vuelo
+          auxOceania[x-55]=VIAJE[0].destino.lista[x][0] +", Cupos: "+str(VIAJE[0].destino.lista[x][1]) + ", Precio(unid):$ "+str(VIAJE[0].destino.lista[x][2])
+        else:
+          auxOceania[x-55]=VIAJE[0].destino.lista[x][0]+ ", Agotado" 
+      # Creo los botones , sin nunguna direccion porque solo es para verificar
+      query.edit_message_text("(Guayas- Oceania)  En el Aeropuerto Jose Joaquin Olmedo esta disponible los siguientes vuelos:", 
+                              reply_markup=InlineKeyboardMarkup([ 
+                                                                  [InlineKeyboardButton(auxOceania[0], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxOceania[1], callback_data='null')],
+                                                                  [InlineKeyboardButton("Regresar", callback_data='Guayas')],
+                                                                 ]))
+    if choose == 'qOceania':
+      for x in range(55,57):
+      # VIAJE[1] son los vuelos que tiene guayas,  verifica si tiene o no tiene cupo
+        if  VIAJE[1].destino.lista[x][1]>0:
+          auxOceania[x-55]=VIAJE[1].destino.lista[x][0] +", Cupos: "+str(VIAJE[1].destino.lista[x][1]) + ", Precio(unid):$ "+str(VIAJE[1].destino.lista[x][2])
+        else:
+          auxOceania[x-55]=VIAJE[1].destino.lista[x][0]+ ", Agotado" 
+      # Creo los botones , sin nunguna direccion porque solo es para verificar
+      query.edit_message_text("(Quito - Oceania) En el Aeropuerto Mariscal de Sucre esta disponible los siguientes vuelos:", 
+                              reply_markup=InlineKeyboardMarkup([ 
+                                                                  [InlineKeyboardButton(auxOceania[0], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxOceania[1], callback_data='null')],
+                                                                  [InlineKeyboardButton("Regresar", callback_data='Quito')],
+                                                                 ]))
+##########################################
+    if choose == 'gNacional':
+      for x in range(57,69):
+      # VIAJE[0] son los vuelos que tiene guayas,  verifica si tiene o no tiene cupo
+        if  VIAJE[0].destino.lista[x][1]>0: # lista[x][1] es el numero de asiento de vuelo
+          auxNacional[x-57]=VIAJE[0].destino.lista[x][0] +", Cupos: "+str(VIAJE[0].destino.lista[x][1]) + ", Precio(unid):$ "+str(VIAJE[0].destino.lista[x][2])
+        else:
+          auxNacional[x-57]=VIAJE[0].destino.lista[x][0]+ ", Agotado" 
+      # Creo los botones , sin nunguna direccion porque solo es para verificar
+      query.edit_message_text("(Guayas- Nacional) En el Aeropuerto Jose Joaquin Olmedo esta disponible los siguientes vuelos:", 
+                              reply_markup=InlineKeyboardMarkup([ 
+                                                                  [InlineKeyboardButton(auxNacional[0], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxNacional[1], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxNacional[2], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxNacional[3], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxNacional[4], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxNacional[5], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxNacional[6], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxNacional[7], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxNacional[9], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxNacional[10], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxNacional[11], callback_data='null')], 
+                                                                  [InlineKeyboardButton("Regresar", callback_data='Guayas')],
+                                                                 ]))
+    if choose == 'qNacional':
+      for x in range(57,69):
+      # VIAJE[1] son los vuelos que tiene guayas,  verifica si tiene o no tiene cupo
+        if  VIAJE[1].destino.lista[x][1]>0:
+          auxNacional[x-57]=VIAJE[1].destino.lista[x][0] +", Cupos: "+str(VIAJE[1].destino.lista[x][1]) + ", Precio(unid):$ "+str(VIAJE[1].destino.lista[x][2])
+        else:
+          auxNacional[x-57]=VIAJE[1].destino.lista[x][0]+ ", Agotado" 
+      # Creo los botones , sin nunguna direccion porque solo es para verificar
+      query.edit_message_text("(Quito- Nacional) En el Aeropuerto Mariscal de Sucre esta disponible los siguientes vuelos:", 
+                              reply_markup=InlineKeyboardMarkup([ 
+                                                                  [InlineKeyboardButton(auxNacional[0], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxNacional[1], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxNacional[2], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxNacional[3], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxNacional[4], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxNacional[5], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxNacional[6], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxNacional[7], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxNacional[9], callback_data='null')],
+                                                                  [InlineKeyboardButton(auxNacional[10], callback_data='null')], 
+                                                                  [InlineKeyboardButton(auxNacional[11], callback_data='null')], 
+                                                                  [InlineKeyboardButton("Regresar", callback_data='Quito')],
+                                                                 ]))
+ ##########################################     
+    if choose == 'buscar':                          # Edita los botones que ya fueron creados y borra la informacion anterior
+      query.edit_message_text(text, reply_markup=InlineKeyboardMarkup([
+                                              [InlineKeyboardButton('Reservar vuelo solo ida', callback_data='buyT'),#Crea el btn1 de Buscar
+                                              InlineKeyboardButton("Reservar vuelo ida y vuelta", callback_data='buyRT')], #Crea el btn2 Buscar
+                                              [InlineKeyboardButton("Regresar", callback_data='regresar') ], #Crea el btn3 de Buscar
+                                        ]))
+      
 
-###########################
-#Funcion para el boton return 
-def btnReturn(update, context): 
-  query=update.callback_query
-  query.answer()
-  query.edit_message_text(
-      text = 'Para reservar su vuelo elija una de esta opciones: ', 
-      reply_markup=InlineKeyboardMarkup([
-                                         [InlineKeyboardButton(text='Listar vuelos disponibles', callback_data='list')], #reCrea el btn1 
-                                         [InlineKeyboardButton(text='Buscar vuelo por origen y destino', callback_data='search')], #reCrea el btn2
-                                          ])
-  )
-  return INPUT_TEXT
+##########################################
+    if(choose== 'buyT'):
+      auxBoleto[5]= 'Solo ida'
+      auxFechaF = [0,0,0]
+      query.edit_message_text('Elija el origen', reply_markup=InlineKeyboardMarkup([
+                                              [InlineKeyboardButton('Guayas', callback_data='guayasT'),#Crea el btn1 de Buscar
+                                              InlineKeyboardButton("Quito", callback_data='quitoT')], #Crea el btn2 Buscar
+                                              [InlineKeyboardButton("Regresar", callback_data='buscar') ], #Crea el btn3 de Buscar
+                                        ]),)
+##########################################
+    if(choose== 'guayasT'):
+      auxBoleto[0]= "Ecuador-Guayas-Guayaquil-Aeropuerto de José Joaquín de Olmedo \n"
+      query.edit_message_text('(Guayas-Guayaquil) Elija el destino:', 
+                              reply_markup=InlineKeyboardMarkup([
+                                                                 [InlineKeyboardButton("Africa", callback_data='null') ],        #africa
+                                                                 [InlineKeyboardButton('Luanda, Angola', callback_data='0a',), 
+                                                                 InlineKeyboardButton("Argel, Argelia", callback_data='1a')], 
+                                                                 [InlineKeyboardButton('Nairobi,Kenia', callback_data='2a',),
+                                                                 InlineKeyboardButton("Antananarivo, Madagasca", callback_data='3a')],
+                                                                 [InlineKeyboardButton("America", callback_data='null') ],      #America
+                                                                 [InlineKeyboardButton('Buenos Aires, Argentina', callback_data='4a',),
+                                                                 InlineKeyboardButton("Belmopán, Belice", callback_data='5a')],
+                                                                 [InlineKeyboardButton('La Paz, Bolivia', callback_data='6a',),
+                                                                 InlineKeyboardButton("Brasilia, Brasil", callback_data='7a')],
+                                                                 [InlineKeyboardButton('Ottawa, Canadá', callback_data='8a',),
+                                                                 InlineKeyboardButton("Santiago de Chile, Chile", callback_data='9a')],
+                                                                 [InlineKeyboardButton('Bogotá Colombia', callback_data='10a',),
+                                                                 InlineKeyboardButton("San José, Costa Rica", callback_data='11a')],
+                                                                 [InlineKeyboardButton('La Habana, Cuba', callback_data='12a',),
+                                                                 InlineKeyboardButton("Roseau, Dominica", callback_data='13a')],
+                                                                 [InlineKeyboardButton('San Salvador, El Salvador', callback_data='14a',),
+                                                                 InlineKeyboardButton("Washingthon D.C, EEUU", callback_data='15a')],
+                                                                 [InlineKeyboardButton('Saunt George, Granada', callback_data='16a',),
+                                                                 InlineKeyboardButton("Ciudad de Guatemala, Guatemala", callback_data='17a')],
+                                                                 [InlineKeyboardButton('Puerto Príncipe, Haití', callback_data='18a',),
+                                                                 InlineKeyboardButton("Tegucigalpa, Honduras", callback_data='19a')],
+                                                                 [InlineKeyboardButton('Kingston, Jamaica', callback_data='20a',),
+                                                                 InlineKeyboardButton("Ciudad de México, México", callback_data='21a')],
+                                                                 [InlineKeyboardButton('Panamá, Panamá', callback_data='22a',),
+                                                                 InlineKeyboardButton("Asunción, Paraguay", callback_data='23a')],
+                                                                 [InlineKeyboardButton('Managua, Nicaragua', callback_data='24a',),
+                                                                 InlineKeyboardButton("Montevideo, Uruguay", callback_data='25a')],
+                                                                 [InlineKeyboardButton('Caracas, Venezuela', callback_data='26a',),
+                                                                 InlineKeyboardButton("Lima, Perú", callback_data='27a')],
+                                                                 [InlineKeyboardButton("Asia", callback_data='null')],      #Asia
+                                                                 [InlineKeyboardButton('Kabul, Afganistán', callback_data='28a',),
+                                                                 InlineKeyboardButton("Raid, Arabia Suadita", callback_data='29a')],
+                                                                 [InlineKeyboardButton('Pekín, China', callback_data='30a',),
+                                                                 InlineKeyboardButton("Nicosia, Chipre", callback_data='31a')],
+                                                                 [InlineKeyboardButton('Pionyang, Corea del Norte', callback_data='32a',),
+                                                                 InlineKeyboardButton("Seúl, Corea del Sur", callback_data='33a')],
+                                                                 [InlineKeyboardButton('Manila, Filipinas', callback_data='34a',),
+                                                                 InlineKeyboardButton("Tokio, Japón", callback_data='35a')],
+                                                                 [InlineKeyboardButton('Jerusalén, Israel', callback_data='36a',),
+                                                                 InlineKeyboardButton("Beirut, Líbano", callback_data='37a')],
+                                                                 [InlineKeyboardButton('Ulán Bator, Mongolia', callback_data='38a',),
+                                                                 InlineKeyboardButton("Ankara, Turquía", callback_data='39a')],
+                                                                 [InlineKeyboardButton('BangKok, Tailandia', callback_data='40a',),
+                                                                 InlineKeyboardButton("Hanói, Vietnam", callback_data='41a')],
+                                                                 [InlineKeyboardButton("Europa", callback_data='null')],     #Europa
+                                                                 [InlineKeyboardButton('Berlín, Alemania', callback_data='42a',),
+                                                                 InlineKeyboardButton("Brusela, Bélgica", callback_data='43a')],
+                                                                 [InlineKeyboardButton('Zagreb, Croacia', callback_data='44a',),
+                                                                 InlineKeyboardButton("Copenhague, Dinamarca", callback_data='45a')],
+                                                                 [InlineKeyboardButton('Madrid, España', callback_data='46a',),
+                                                                 InlineKeyboardButton("Helsinhi, Filandia", callback_data='47a')],
+                                                                 [InlineKeyboardButton('París, Francia', callback_data='48a',),
+                                                                 InlineKeyboardButton("Atenas, Grecia", callback_data='49a')],
+                                                                 [InlineKeyboardButton('Dublín, Irlanda', callback_data='50a',),
+                                                                 InlineKeyboardButton("Roma, Italia", callback_data='51a')],
+                                                                 [InlineKeyboardButton('Estocolmo, Suecia', callback_data='52a',),
+                                                                 InlineKeyboardButton("Berma, Suiza", callback_data='53a')],
+                                                                 [InlineKeyboardButton('Muscú, Rusia', callback_data='54a',),
+                                                                 InlineKeyboardButton(" ", callback_data='null')],
+                                                                 [InlineKeyboardButton("Oceanía", callback_data='null')],     #Oceania
+                                                                 [InlineKeyboardButton('Canberra, Australia', callback_data='55a',),
+                                                                 InlineKeyboardButton("Wellington, Nueva Zelanda", callback_data='56a')],
+                                                                 [InlineKeyboardButton("Nacionales", callback_data='null')],  #Nacional
+                                                                 [InlineKeyboardButton('Morona Santiago, Ecu', callback_data='57a',),
+                                                                 InlineKeyboardButton("Loja, Ecu", callback_data='58a')],
+                                                                 [InlineKeyboardButton('Zamora Chinchipe, Ecu', callback_data='59a',),
+                                                                 InlineKeyboardButton("Pastaza, Ecu", callback_data='60a')],
+                                                                 [InlineKeyboardButton('Sucumbíos, Ecu', callback_data='61a',),
+                                                                 InlineKeyboardButton("Galápagos, Ecu", callback_data='62a')],
+                                                                 [InlineKeyboardButton('Manabí, Ecu', callback_data='63a',),
+                                                                 InlineKeyboardButton("Salinas, Ecu", callback_data='64a')],
+                                                                 [InlineKeyboardButton('Esmeralda, Ecu', callback_data='65a',),
+                                                                 InlineKeyboardButton("Latacunga, Ecu", callback_data='66a')],
+                                                                 [InlineKeyboardButton('Quito,Ecu', callback_data='67a',),
+                                                                 InlineKeyboardButton(" ", callback_data='68a')],
+                                                                 [InlineKeyboardButton("Regresar", callback_data='buyT') ], 
+                                                                 ]),)
+##########################################
+    if(choose== 'quitoT'):
+      auxBoleto[0]= "Ecuador-Pichincha-Quito-Aeropuerto de Mariscal de sucre \n"
+      query.edit_message_text('(Pichincha-Quito) Elija el destino:', 
+                              reply_markup=InlineKeyboardMarkup([
+                                                                 [InlineKeyboardButton("Africa", callback_data='null') ],        #africa
+                                                                 [InlineKeyboardButton('Luanda, Angola', callback_data='0a',), 
+                                                                 InlineKeyboardButton("Argel, Argelia", callback_data='1a')], 
+                                                                 [InlineKeyboardButton('Nairobi,Kenia', callback_data='2a',),
+                                                                 InlineKeyboardButton("Antananarivo, Madagasca", callback_data='3a')],
+                                                                 [InlineKeyboardButton("America", callback_data='null') ],      #America
+                                                                 [InlineKeyboardButton('Buenos Aires, Argentina', callback_data='4a',),
+                                                                 InlineKeyboardButton("Belmopán, Belice", callback_data='5a')],
+                                                                 [InlineKeyboardButton('La Paz, Bolivia', callback_data='6a',),
+                                                                 InlineKeyboardButton("Brasilia, Brasil", callback_data='7a')],
+                                                                 [InlineKeyboardButton('Ottawa, Canadá', callback_data='8a',),
+                                                                 InlineKeyboardButton("Santiago de Chile, Chile", callback_data='9a')],
+                                                                 [InlineKeyboardButton('Bogotá Colombia', callback_data='10a',),
+                                                                 InlineKeyboardButton("San José, Costa Rica", callback_data='11a')],
+                                                                 [InlineKeyboardButton('La Habana, Cuba', callback_data='12a',),
+                                                                 InlineKeyboardButton("Roseau, Dominica", callback_data='13a')],
+                                                                 [InlineKeyboardButton('San Salvador, El Salvador', callback_data='14a',),
+                                                                 InlineKeyboardButton("Washingthon D.C, EEUU", callback_data='15a')],
+                                                                 [InlineKeyboardButton('Saunt George, Granada', callback_data='16a',),
+                                                                 InlineKeyboardButton("Ciudad de Guatemala, Guatemala", callback_data='17a')],
+                                                                 [InlineKeyboardButton('Puerto Príncipe, Haití', callback_data='18a',),
+                                                                 InlineKeyboardButton("Tegucigalpa, Honduras", callback_data='19a')],
+                                                                 [InlineKeyboardButton('Kingston, Jamaica', callback_data='20a',),
+                                                                 InlineKeyboardButton("Ciudad de México, México", callback_data='21a')],
+                                                                 [InlineKeyboardButton('Panamá, Panamá', callback_data='22a',),
+                                                                 InlineKeyboardButton("Asunción, Paraguay", callback_data='23a')],
+                                                                 [InlineKeyboardButton('Managua, Nicaragua', callback_data='24a',),
+                                                                 InlineKeyboardButton("Montevideo, Uruguay", callback_data='25a')],
+                                                                 [InlineKeyboardButton('Caracas, Venezuela', callback_data='26a',),
+                                                                 InlineKeyboardButton("Lima, Perú", callback_data='27a')],
+                                                                 [InlineKeyboardButton("Asia", callback_data='null')],      #Asia
+                                                                 [InlineKeyboardButton('Kabul, Afganistán', callback_data='28a',),
+                                                                 InlineKeyboardButton("Raid, Arabia Suadita", callback_data='29a')],
+                                                                 [InlineKeyboardButton('Pekín, China', callback_data='30a',),
+                                                                 InlineKeyboardButton("Nicosia, Chipre", callback_data='31a')],
+                                                                 [InlineKeyboardButton('Pionyang, Corea del Norte', callback_data='32a',),
+                                                                 InlineKeyboardButton("Seúl, Corea del Sur", callback_data='33a')],
+                                                                 [InlineKeyboardButton('Manila, Filipinas', callback_data='34a',),
+                                                                 InlineKeyboardButton("Tokio, Japón", callback_data='35a')],
+                                                                 [InlineKeyboardButton('Jerusalén, Israel', callback_data='36a',),
+                                                                 InlineKeyboardButton("Beirut, Líbano", callback_data='37a')],
+                                                                 [InlineKeyboardButton('Ulán Bator, Mongolia', callback_data='38a',),
+                                                                 InlineKeyboardButton("Ankara, Turquía", callback_data='39a')],
+                                                                 [InlineKeyboardButton('BangKok, Tailandia', callback_data='40a',),
+                                                                 InlineKeyboardButton("Hanói, Vietnam", callback_data='41a')],
+                                                                 [InlineKeyboardButton("Europa", callback_data='null')],     #Europa
+                                                                 [InlineKeyboardButton('Berlín, Alemania', callback_data='42a',),
+                                                                 InlineKeyboardButton("Brusela, Bélgica", callback_data='43a')],
+                                                                 [InlineKeyboardButton('Zagreb, Croacia', callback_data='44a',),
+                                                                 InlineKeyboardButton("Copenhague, Dinamarca", callback_data='45a')],
+                                                                 [InlineKeyboardButton('Madrid, España', callback_data='46a',),
+                                                                 InlineKeyboardButton("Helsinhi, Filandia", callback_data='47a')],
+                                                                 [InlineKeyboardButton('París, Francia', callback_data='48a',),
+                                                                 InlineKeyboardButton("Atenas, Grecia", callback_data='49a')],
+                                                                 [InlineKeyboardButton('Dublín, Irlanda', callback_data='50a',),
+                                                                 InlineKeyboardButton("Roma, Italia", callback_data='51a')],
+                                                                 [InlineKeyboardButton('Estocolmo, Suecia', callback_data='52a',),
+                                                                 InlineKeyboardButton("Berma, Suiza", callback_data='53a')],
+                                                                 [InlineKeyboardButton('Muscú, Rusia', callback_data='54a',),
+                                                                 InlineKeyboardButton(" ", callback_data='null')],
+                                                                 [InlineKeyboardButton("Oceanía", callback_data='null')],     #Oceania
+                                                                 [InlineKeyboardButton('Canberra, Australia', callback_data='55a',),
+                                                                 InlineKeyboardButton("Wellington, Nueva Zelanda", callback_data='56a')],
+                                                                 [InlineKeyboardButton("Nacionales", callback_data='null')],  #Nacional
+                                                                 [InlineKeyboardButton('Morona Santiago, Ecu', callback_data='57a',),
+                                                                 InlineKeyboardButton("Loja, Ecu", callback_data='58a')],
+                                                                 [InlineKeyboardButton('Zamora Chinchipe, Ecu', callback_data='59a',),
+                                                                 InlineKeyboardButton("Pastaza, Ecu", callback_data='60a')],
+                                                                 [InlineKeyboardButton('Sucumbíos, Ecu', callback_data='61a',),
+                                                                 InlineKeyboardButton("Galápagos, Ecu", callback_data='62a')],
+                                                                 [InlineKeyboardButton('Manabí, Ecu', callback_data='63a',),
+                                                                 InlineKeyboardButton("Salinas, Ecu", callback_data='64a')],
+                                                                 [InlineKeyboardButton('Esmeralda, Ecu', callback_data='65a',),
+                                                                 InlineKeyboardButton("Latacunga, Ecu", callback_data='66a')],
+                                                                 [InlineKeyboardButton('Quito,Ecu', callback_data='67a',),
+                                                                 InlineKeyboardButton(" ", callback_data='68a')],
+                                                                 [InlineKeyboardButton("Regresar", callback_data='buyT') ], 
+                                                                 ]),)
+    if(choose== '0a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[0][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '1a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[1][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '2a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[2][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '3a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[3][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '4a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[4][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '5a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[5][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '6a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[6][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '7a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[7][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '8a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[8][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '9a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[9][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '10a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[10][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '11a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[11][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '12a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[12][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '13a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[13][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '14a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[14][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '15a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[15][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '16a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[16][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '17a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[17][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '18a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[18][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '19a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[19][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '20a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[20][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '21a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[21][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '22a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[22][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '23a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[23][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '24a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[24][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '25a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[25][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '26a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[26][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '27a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[27][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '28a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[28][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '29a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[29][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '30a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[30][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '31a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[31][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '32a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[32][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '33a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[33][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '34a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[34][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '35a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[35][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '36a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[36][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '37a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[37][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '38a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[38][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '39a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[39][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '40a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[40][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '41a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[41][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '42a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[42][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '43a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[43][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '44a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[44][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '45'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[45][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '46a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[46][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '47a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[47][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '48a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[48][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '49a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[49][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '50a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[50][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '51a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[51][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '52a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[52][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '53a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[53][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '54a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[54][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '55a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[55][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '56a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[56][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '57a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[57][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '58a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[58][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '59a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[59][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '60a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[60][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '61a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[61][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '62a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[62][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '63a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[63][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '64a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[64][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '65a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[65][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '66a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[66][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '67a'):
+      today = date.today()
+      auxBoleto[1]= VIAJE[1].destino.lista[67][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== '68a'):
+      
+      auxBoleto[1]= VIAJE[1].destino.lista[68][0]
+      query.edit_message_text("Elija el año",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(today.year, callback_data='mes1'),
+                                          InlineKeyboardButton(today.year+1, callback_data='mes2')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== 'mes1'):
+      auxFechaI[0] = today.year
+      print(auxFechaI[0])
+      query.edit_message_text("Elija el mes",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton('Enero', callback_data='enero'),
+                                          InlineKeyboardButton('Febrero', callback_data='febrero')],
+                                          [InlineKeyboardButton('Marzo', callback_data='marzo'),
+                                          InlineKeyboardButton('Abril', callback_data='abril')],
+                                          [InlineKeyboardButton('Mayo', callback_data='mayo'),
+                                          InlineKeyboardButton('Junio', callback_data='junio')],
+                                          [InlineKeyboardButton('Julio', callback_data='julio'),
+                                          InlineKeyboardButton('Agosto', callback_data='agosto')],
+                                          [InlineKeyboardButton('Septiembre', callback_data='septiembre'),
+                                          InlineKeyboardButton('Octubre', callback_data='octubre')],
+                                          [InlineKeyboardButton('Noviembre', callback_data='noviembre'),
+                                          InlineKeyboardButton('Diciembre', callback_data='diciembre')],
+                                          ]))
+    if(choose== 'mes2'):
+      auxFechaI[0] = today.year+1
+      print('entrom2')
+      query.edit_message_text("Elija el mes",reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton('Enero', callback_data='enero'),
+                                          InlineKeyboardButton('Febrero', callback_data='febrero')],
+                                          [InlineKeyboardButton('Marzo', callback_data='marzo'),
+                                          InlineKeyboardButton('Abril', callback_data='abril')],
+                                          [InlineKeyboardButton('Mayo', callback_data='mayo'),
+                                          InlineKeyboardButton('Junio', callback_data='junio')],
+                                          [InlineKeyboardButton('Julio', callback_data='julio'),
+                                          InlineKeyboardButton('Agosto', callback_data='agosto')],
+                                          [InlineKeyboardButton('Septiembre', callback_data='septiembre'),
+                                          InlineKeyboardButton('Octubre', callback_data='octubre')],
+                                          [InlineKeyboardButton('Noviembre', callback_data='noviembre'),
+                                          InlineKeyboardButton('Diciembre', callback_data='diciembre')],
+                                          [InlineKeyboardButton("Regresar", callback_data='buyT')]]))
+    if(choose== 'enero'):
+      auxFechaI[1] = 1
+      query.edit_message_text("Elija el dia",reply_markup=InlineKeyboardMarkup([
+                                          [InlineKeyboardButton('1', callback_data='1'),InlineKeyboardButton('2', callback_data='2'),
+                                           InlineKeyboardButton('3', callback_data='3'),InlineKeyboardButton('4', callback_data='4'),
+                                           InlineKeyboardButton('5', callback_data='5'),InlineKeyboardButton('6', callback_data='6'),
+                                          InlineKeyboardButton('7', callback_data='7')],[InlineKeyboardButton('8', callback_data='8'),
+                                           InlineKeyboardButton('9', callback_data='9'),InlineKeyboardButton('10', callback_data='10'),
+                                           InlineKeyboardButton('11', callback_data='11'),InlineKeyboardButton('12', callback_data='12'),
+                                          InlineKeyboardButton('13', callback_data='13'),InlineKeyboardButton('14', callback_data='14')],
+                                          [InlineKeyboardButton('15', callback_data='15'),InlineKeyboardButton('16', callback_data='16'),
+                                           InlineKeyboardButton('17', callback_data='17'),InlineKeyboardButton('18', callback_data='18'),
+                                           InlineKeyboardButton('19', callback_data='19'),InlineKeyboardButton('20', callback_data='20'),
+                                          InlineKeyboardButton('21', callback_data='21')],[InlineKeyboardButton('22', callback_data='22'),
+                                           InlineKeyboardButton('23 ', callback_data='23'),InlineKeyboardButton('24', callback_data='24'),
+                                           InlineKeyboardButton('25', callback_data='25'),InlineKeyboardButton('26', callback_data='26'),
+                                          InlineKeyboardButton('27', callback_data='27'),InlineKeyboardButton('28', callback_data='28')],
+                                          [InlineKeyboardButton('29', callback_data='29'),InlineKeyboardButton('30', callback_data='30'),
+                                           InlineKeyboardButton('31', callback_data='31')],[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose== 'febrero'):
+      auxFechaI[1] = 2
+      query.edit_message_text("Elija el dia",reply_markup=InlineKeyboardMarkup([
+                                          [InlineKeyboardButton('1', callback_data='1'),InlineKeyboardButton('2', callback_data='2'),
+                                           InlineKeyboardButton('3', callback_data='3'),InlineKeyboardButton('4', callback_data='4'),
+                                           InlineKeyboardButton('5', callback_data='5'),InlineKeyboardButton('6', callback_data='6'),
+                                          InlineKeyboardButton('7', callback_data='7')],[InlineKeyboardButton('8', callback_data='8'),
+                                           InlineKeyboardButton('9', callback_data='9'),InlineKeyboardButton('10', callback_data='10'),
+                                           InlineKeyboardButton('11', callback_data='11'),InlineKeyboardButton('12', callback_data='12'),
+                                          InlineKeyboardButton('13', callback_data='13'),InlineKeyboardButton('14', callback_data='14')],
+                                          [InlineKeyboardButton('15', callback_data='15'),InlineKeyboardButton('16', callback_data='16'),
+                                           InlineKeyboardButton('17', callback_data='17'),InlineKeyboardButton('18', callback_data='18'),
+                                           InlineKeyboardButton('19', callback_data='19'),InlineKeyboardButton('20', callback_data='20'),
+                                          InlineKeyboardButton('21', callback_data='21')],[InlineKeyboardButton('22', callback_data='22'),
+                                           InlineKeyboardButton('23 ', callback_data='23'),InlineKeyboardButton('24', callback_data='24'),
+                                           InlineKeyboardButton('25', callback_data='25'),InlineKeyboardButton('26', callback_data='26'),
+                                          InlineKeyboardButton('27', callback_data='27'),InlineKeyboardButton('28', callback_data='28')],
+                                          [InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose== 'marzo'):
+      auxFechaI[1] = 3
+      query.edit_message_text("Elija el dia",reply_markup=InlineKeyboardMarkup([
+                                          [InlineKeyboardButton('1', callback_data='1'),InlineKeyboardButton('2', callback_data='2'),
+                                           InlineKeyboardButton('3', callback_data='3'),InlineKeyboardButton('4', callback_data='4'),
+                                           InlineKeyboardButton('5', callback_data='5'),InlineKeyboardButton('6', callback_data='6'),
+                                          InlineKeyboardButton('7', callback_data='7')],[InlineKeyboardButton('8', callback_data='8'),
+                                           InlineKeyboardButton('9', callback_data='9'),InlineKeyboardButton('10', callback_data='10'),
+                                           InlineKeyboardButton('11', callback_data='11'),InlineKeyboardButton('12', callback_data='12'),
+                                          InlineKeyboardButton('13', callback_data='13'),InlineKeyboardButton('14', callback_data='14')],
+                                          [InlineKeyboardButton('15', callback_data='15'),InlineKeyboardButton('16', callback_data='16'),
+                                           InlineKeyboardButton('17', callback_data='17'),InlineKeyboardButton('18', callback_data='18'),
+                                           InlineKeyboardButton('19', callback_data='19'),InlineKeyboardButton('20', callback_data='20'),
+                                          InlineKeyboardButton('21', callback_data='21')],[InlineKeyboardButton('22', callback_data='22'),
+                                           InlineKeyboardButton('23 ', callback_data='23'),InlineKeyboardButton('24', callback_data='24'),
+                                           InlineKeyboardButton('25', callback_data='25'),InlineKeyboardButton('26', callback_data='26'),
+                                          InlineKeyboardButton('27', callback_data='27'),InlineKeyboardButton('28', callback_data='28')],
+                                          [InlineKeyboardButton('29', callback_data='29'),InlineKeyboardButton('30', callback_data='30'),
+                                           InlineKeyboardButton('31', callback_data='31')],[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose== 'abril'):
+      auxFechaI[1] = 4
+      query.edit_message_text("Elija el dia",reply_markup=InlineKeyboardMarkup([
+                                          [InlineKeyboardButton('1', callback_data='1'),InlineKeyboardButton('2', callback_data='2'),
+                                           InlineKeyboardButton('3', callback_data='3'),InlineKeyboardButton('4', callback_data='4'),
+                                           InlineKeyboardButton('5', callback_data='5'),InlineKeyboardButton('6', callback_data='6'),
+                                          InlineKeyboardButton('7', callback_data='7')],[InlineKeyboardButton('8', callback_data='8'),
+                                           InlineKeyboardButton('9', callback_data='9'),InlineKeyboardButton('10', callback_data='10'),
+                                           InlineKeyboardButton('11', callback_data='11'),InlineKeyboardButton('12', callback_data='12'),
+                                          InlineKeyboardButton('13', callback_data='13'),InlineKeyboardButton('14', callback_data='14')],
+                                          [InlineKeyboardButton('15', callback_data='15'),InlineKeyboardButton('16', callback_data='16'),
+                                           InlineKeyboardButton('17', callback_data='17'),InlineKeyboardButton('18', callback_data='18'),
+                                           InlineKeyboardButton('19', callback_data='19'),InlineKeyboardButton('20', callback_data='20'),
+                                          InlineKeyboardButton('21', callback_data='21')],[InlineKeyboardButton('22', callback_data='22'),
+                                           InlineKeyboardButton('23 ', callback_data='23'),InlineKeyboardButton('24', callback_data='24'),
+                                           InlineKeyboardButton('25', callback_data='25'),InlineKeyboardButton('26', callback_data='26'),
+                                          InlineKeyboardButton('27', callback_data='27'),InlineKeyboardButton('28', callback_data='28')],
+                                          [InlineKeyboardButton('29', callback_data='29'),InlineKeyboardButton('30', callback_data='30')],
+                                          [InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose== 'mayo'):
+      auxFechaI[1] = 5
+      query.edit_message_text("Elija el dia",reply_markup=InlineKeyboardMarkup([
+                                          [InlineKeyboardButton('1', callback_data='1'),InlineKeyboardButton('2', callback_data='2'),
+                                           InlineKeyboardButton('3', callback_data='3'),InlineKeyboardButton('4', callback_data='4'),
+                                           InlineKeyboardButton('5', callback_data='5'),InlineKeyboardButton('6', callback_data='6'),
+                                          InlineKeyboardButton('7', callback_data='7')],[InlineKeyboardButton('8', callback_data='8'),
+                                           InlineKeyboardButton('9', callback_data='9'),InlineKeyboardButton('10', callback_data='10'),
+                                           InlineKeyboardButton('11', callback_data='11'),InlineKeyboardButton('12', callback_data='12'),
+                                          InlineKeyboardButton('13', callback_data='13'),InlineKeyboardButton('14', callback_data='14')],
+                                          [InlineKeyboardButton('15', callback_data='15'),InlineKeyboardButton('16', callback_data='16'),
+                                           InlineKeyboardButton('17', callback_data='17'),InlineKeyboardButton('18', callback_data='18'),
+                                           InlineKeyboardButton('19', callback_data='19'),InlineKeyboardButton('20', callback_data='20'),
+                                          InlineKeyboardButton('21', callback_data='21')],[InlineKeyboardButton('22', callback_data='22'),
+                                           InlineKeyboardButton('23 ', callback_data='23'),InlineKeyboardButton('24', callback_data='24'),
+                                           InlineKeyboardButton('25', callback_data='25'),InlineKeyboardButton('26', callback_data='26'),
+                                          InlineKeyboardButton('27', callback_data='27'),InlineKeyboardButton('28', callback_data='28')],
+                                          [InlineKeyboardButton('29', callback_data='29'),InlineKeyboardButton('30', callback_data='30'),
+                                           InlineKeyboardButton('31', callback_data='31')],[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose== 'junio'):
+      auxFechaI[1] = 6
+      query.edit_message_text("Elija el dia",reply_markup=InlineKeyboardMarkup([
+                                          [InlineKeyboardButton('1', callback_data='1'),InlineKeyboardButton('2', callback_data='2'),
+                                           InlineKeyboardButton('3', callback_data='3'),InlineKeyboardButton('4', callback_data='4'),
+                                           InlineKeyboardButton('5', callback_data='5'),InlineKeyboardButton('6', callback_data='6'),
+                                          InlineKeyboardButton('7', callback_data='7')],[InlineKeyboardButton('8', callback_data='8'),
+                                           InlineKeyboardButton('9', callback_data='9'),InlineKeyboardButton('10', callback_data='10'),
+                                           InlineKeyboardButton('11', callback_data='11'),InlineKeyboardButton('12', callback_data='12'),
+                                          InlineKeyboardButton('13', callback_data='13'),InlineKeyboardButton('14', callback_data='14')],
+                                          [InlineKeyboardButton('15', callback_data='15'),InlineKeyboardButton('16', callback_data='16'),
+                                           InlineKeyboardButton('17', callback_data='17'),InlineKeyboardButton('18', callback_data='18'),
+                                           InlineKeyboardButton('19', callback_data='19'),InlineKeyboardButton('20', callback_data='20'),
+                                          InlineKeyboardButton('21', callback_data='21')],[InlineKeyboardButton('22', callback_data='22'),
+                                           InlineKeyboardButton('23 ', callback_data='23'),InlineKeyboardButton('24', callback_data='24'),
+                                           InlineKeyboardButton('25', callback_data='25'),InlineKeyboardButton('26', callback_data='26'),
+                                          InlineKeyboardButton('27', callback_data='27'),InlineKeyboardButton('28', callback_data='28')],
+                                          [InlineKeyboardButton('29', callback_data='29'),InlineKeyboardButton('30', callback_data='30')],
+                                          [InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose== 'julio'):
+      auxFechaI[1] = 7
+      query.edit_message_text("Elija el dia",reply_markup=InlineKeyboardMarkup([
+                                          [InlineKeyboardButton('1', callback_data='1'),InlineKeyboardButton('2', callback_data='2'),
+                                           InlineKeyboardButton('3', callback_data='3'),InlineKeyboardButton('4', callback_data='4'),
+                                           InlineKeyboardButton('5', callback_data='5'),InlineKeyboardButton('6', callback_data='6'),
+                                          InlineKeyboardButton('7', callback_data='7')],[InlineKeyboardButton('8', callback_data='8'),
+                                           InlineKeyboardButton('9', callback_data='9'),InlineKeyboardButton('10', callback_data='10'),
+                                           InlineKeyboardButton('11', callback_data='11'),InlineKeyboardButton('12', callback_data='12'),
+                                          InlineKeyboardButton('13', callback_data='13'),InlineKeyboardButton('14', callback_data='14')],
+                                          [InlineKeyboardButton('15', callback_data='15'),InlineKeyboardButton('16', callback_data='16'),
+                                           InlineKeyboardButton('17', callback_data='17'),InlineKeyboardButton('18', callback_data='18'),
+                                           InlineKeyboardButton('19', callback_data='19'),InlineKeyboardButton('20', callback_data='20'),
+                                          InlineKeyboardButton('21', callback_data='21')],[InlineKeyboardButton('22', callback_data='22'),
+                                           InlineKeyboardButton('23 ', callback_data='23'),InlineKeyboardButton('24', callback_data='24'),
+                                           InlineKeyboardButton('25', callback_data='25'),InlineKeyboardButton('26', callback_data='26'),
+                                          InlineKeyboardButton('27', callback_data='27'),InlineKeyboardButton('28', callback_data='28')],
+                                          [InlineKeyboardButton('29', callback_data='29'),InlineKeyboardButton('30', callback_data='30'),
+                                           InlineKeyboardButton('31', callback_data='31')],[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose== 'agosto'):
+      auxFechaI[1] = 8
+      query.edit_message_text("Elija el dia",reply_markup=InlineKeyboardMarkup([
+                                          [InlineKeyboardButton('1', callback_data='1'),InlineKeyboardButton('2', callback_data='2'),
+                                           InlineKeyboardButton('3', callback_data='3'),InlineKeyboardButton('4', callback_data='4'),
+                                           InlineKeyboardButton('5', callback_data='5'),InlineKeyboardButton('6', callback_data='6'),
+                                          InlineKeyboardButton('7', callback_data='7')],[InlineKeyboardButton('8', callback_data='8'),
+                                           InlineKeyboardButton('9', callback_data='9'),InlineKeyboardButton('10', callback_data='10'),
+                                           InlineKeyboardButton('11', callback_data='11'),InlineKeyboardButton('12', callback_data='12'),
+                                          InlineKeyboardButton('13', callback_data='13'),InlineKeyboardButton('14', callback_data='14')],
+                                          [InlineKeyboardButton('15', callback_data='15'),InlineKeyboardButton('16', callback_data='16'),
+                                           InlineKeyboardButton('17', callback_data='17'),InlineKeyboardButton('18', callback_data='18'),
+                                           InlineKeyboardButton('19', callback_data='19'),InlineKeyboardButton('20', callback_data='20'),
+                                          InlineKeyboardButton('21', callback_data='21')],[InlineKeyboardButton('22', callback_data='22'),
+                                           InlineKeyboardButton('23 ', callback_data='23'),InlineKeyboardButton('24', callback_data='24'),
+                                           InlineKeyboardButton('25', callback_data='25'),InlineKeyboardButton('26', callback_data='26'),
+                                          InlineKeyboardButton('27', callback_data='27'),InlineKeyboardButton('28', callback_data='28')],
+                                          [InlineKeyboardButton('29', callback_data='29'),InlineKeyboardButton('30', callback_data='30'),
+                                           InlineKeyboardButton('31', callback_data='31')],[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose== 'septiembre'):
+      auxFechaI[1] = 9
+      query.edit_message_text("Elija el dia",reply_markup=InlineKeyboardMarkup([
+                                          [InlineKeyboardButton('1', callback_data='1'),InlineKeyboardButton('2', callback_data='2'),
+                                           InlineKeyboardButton('3', callback_data='3'),InlineKeyboardButton('4', callback_data='4'),
+                                           InlineKeyboardButton('5', callback_data='5'),InlineKeyboardButton('6', callback_data='6'),
+                                          InlineKeyboardButton('7', callback_data='7')],[InlineKeyboardButton('8', callback_data='8'),
+                                           InlineKeyboardButton('9', callback_data='9'),InlineKeyboardButton('10', callback_data='10'),
+                                           InlineKeyboardButton('11', callback_data='11'),InlineKeyboardButton('12', callback_data='12'),
+                                          InlineKeyboardButton('13', callback_data='13'),InlineKeyboardButton('14', callback_data='14')],
+                                          [InlineKeyboardButton('15', callback_data='15'),InlineKeyboardButton('16', callback_data='16'),
+                                           InlineKeyboardButton('17', callback_data='17'),InlineKeyboardButton('18', callback_data='18'),
+                                           InlineKeyboardButton('19', callback_data='19'),InlineKeyboardButton('20', callback_data='20'),
+                                          InlineKeyboardButton('21', callback_data='21')],[InlineKeyboardButton('22', callback_data='22'),
+                                           InlineKeyboardButton('23 ', callback_data='23'),InlineKeyboardButton('24', callback_data='24'),
+                                           InlineKeyboardButton('25', callback_data='25'),InlineKeyboardButton('26', callback_data='26'),
+                                          InlineKeyboardButton('27', callback_data='27'),InlineKeyboardButton('28', callback_data='28')],
+                                          [InlineKeyboardButton('29', callback_data='29'),InlineKeyboardButton('30', callback_data='30')],
+                                          [InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose== 'octubre'):
+      auxFechaI[1] = 10
+      query.edit_message_text("Elija el dia",reply_markup=InlineKeyboardMarkup([
+                                          [InlineKeyboardButton('1', callback_data='1'),InlineKeyboardButton('2', callback_data='2'),
+                                           InlineKeyboardButton('3', callback_data='3'),InlineKeyboardButton('4', callback_data='4'),
+                                           InlineKeyboardButton('5', callback_data='5'),InlineKeyboardButton('6', callback_data='6'),
+                                          InlineKeyboardButton('7', callback_data='7')],[InlineKeyboardButton('8', callback_data='8'),
+                                           InlineKeyboardButton('9', callback_data='9'),InlineKeyboardButton('10', callback_data='10'),
+                                           InlineKeyboardButton('11', callback_data='11'),InlineKeyboardButton('12', callback_data='12'),
+                                          InlineKeyboardButton('13', callback_data='13'),InlineKeyboardButton('14', callback_data='14')],
+                                          [InlineKeyboardButton('15', callback_data='15'),InlineKeyboardButton('16', callback_data='16'),
+                                           InlineKeyboardButton('17', callback_data='17'),InlineKeyboardButton('18', callback_data='18'),
+                                           InlineKeyboardButton('19', callback_data='19'),InlineKeyboardButton('20', callback_data='20'),
+                                          InlineKeyboardButton('21', callback_data='21')],[InlineKeyboardButton('22', callback_data='22'),
+                                           InlineKeyboardButton('23 ', callback_data='23'),InlineKeyboardButton('24', callback_data='24'),
+                                           InlineKeyboardButton('25', callback_data='25'),InlineKeyboardButton('26', callback_data='26'),
+                                          InlineKeyboardButton('27', callback_data='27'),InlineKeyboardButton('28', callback_data='28')],
+                                          [InlineKeyboardButton('29', callback_data='29'),InlineKeyboardButton('30', callback_data='30'),
+                                           InlineKeyboardButton('31', callback_data='31')],[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose== 'noviembre'):
+      auxFechaI[1] = 11
+      query.edit_message_text("Elija el dia",reply_markup=InlineKeyboardMarkup([
+                                          [InlineKeyboardButton('1', callback_data='1'),InlineKeyboardButton('2', callback_data='2'),
+                                           InlineKeyboardButton('3', callback_data='3'),InlineKeyboardButton('4', callback_data='4'),
+                                           InlineKeyboardButton('5', callback_data='5'),InlineKeyboardButton('6', callback_data='6'),
+                                          InlineKeyboardButton('7', callback_data='7')],[InlineKeyboardButton('8', callback_data='8'),
+                                           InlineKeyboardButton('9', callback_data='9'),InlineKeyboardButton('10', callback_data='10'),
+                                           InlineKeyboardButton('11', callback_data='11'),InlineKeyboardButton('12', callback_data='12'),
+                                          InlineKeyboardButton('13', callback_data='13'),InlineKeyboardButton('14', callback_data='14')],
+                                          [InlineKeyboardButton('15', callback_data='15'),InlineKeyboardButton('16', callback_data='16'),
+                                           InlineKeyboardButton('17', callback_data='17'),InlineKeyboardButton('18', callback_data='18'),
+                                           InlineKeyboardButton('19', callback_data='19'),InlineKeyboardButton('20', callback_data='20'),
+                                          InlineKeyboardButton('21', callback_data='21')],[InlineKeyboardButton('22', callback_data='22'),
+                                           InlineKeyboardButton('23 ', callback_data='23'),InlineKeyboardButton('24', callback_data='24'),
+                                           InlineKeyboardButton('25', callback_data='25'),InlineKeyboardButton('26', callback_data='26'),
+                                          InlineKeyboardButton('27', callback_data='27'),InlineKeyboardButton('28', callback_data='28')],
+                                          [InlineKeyboardButton('29', callback_data='29'),InlineKeyboardButton('30', callback_data='30')],
+                                          [InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose== 'diciembre'):
+      auxFechaI[1] = 12
+      query.edit_message_text("Elija el dia",reply_markup=InlineKeyboardMarkup([
+                                          [InlineKeyboardButton('1', callback_data='1'),InlineKeyboardButton('2', callback_data='2'),
+                                           InlineKeyboardButton('3', callback_data='3'),InlineKeyboardButton('4', callback_data='4'),
+                                           InlineKeyboardButton('5', callback_data='5'),InlineKeyboardButton('6', callback_data='6'),
+                                          InlineKeyboardButton('7', callback_data='7')],[InlineKeyboardButton('8', callback_data='8'),
+                                           InlineKeyboardButton('9', callback_data='9'),InlineKeyboardButton('10', callback_data='10'),
+                                           InlineKeyboardButton('11', callback_data='11'),InlineKeyboardButton('12', callback_data='12'),
+                                          InlineKeyboardButton('13', callback_data='13'),InlineKeyboardButton('14', callback_data='14')],
+                                          [InlineKeyboardButton('15', callback_data='15'),InlineKeyboardButton('16', callback_data='16'),
+                                           InlineKeyboardButton('17', callback_data='17'),InlineKeyboardButton('18', callback_data='18'),
+                                           InlineKeyboardButton('19', callback_data='19'),InlineKeyboardButton('20', callback_data='20'),
+                                          InlineKeyboardButton('21', callback_data='21')],[InlineKeyboardButton('22', callback_data='22'),
+                                           InlineKeyboardButton('23 ', callback_data='23'),InlineKeyboardButton('24', callback_data='24'),
+                                           InlineKeyboardButton('25', callback_data='25'),InlineKeyboardButton('26', callback_data='26'),
+                                          InlineKeyboardButton('27', callback_data='27'),InlineKeyboardButton('28', callback_data='28')],
+                                          [InlineKeyboardButton('29', callback_data='29'),InlineKeyboardButton('30', callback_data='30'),
+                                           InlineKeyboardButton('31', callback_data='31')],[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose == '1'):
+      query.edit_message_text("Aun se trabaja en el tema...",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose == '2'):
+      query.edit_message_text("Aun se trabaja en el tema...",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose == '3'):
+      query.edit_message_text("Aun se trabaja en el tema...",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose == '4'):
+      query.edit_message_text("Aun se trabaja en el tema...",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose == '5'):
+      query.edit_message_text("Aun se trabaja en el tema...",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose == '6'):
+      query.edit_message_text("Aun se trabaja en el tema...",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose == '7'):
+      query.edit_message_text("Aun se trabaja en el tema...",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose == '8'):
+      query.edit_message_text("Aun se trabaja en el tema...",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose == '9'):
+      query.edit_message_text("Aun se trabaja en el tema...",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose == '10'):
+      query.edit_message_text("Aun se trabaja en el tema...",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose == '11'):
+      query.edit_message_text("Aun se trabaja en el tema...",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose == '12'):
+      query.edit_message_text("Aun se trabaja en el tema...",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose == '13'):
+      query.edit_message_text("Aun se trabaja en el tema...",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose == '14'):
+      query.edit_message_text("Aun se trabaja en el tema...",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose == '15'):
+      query.edit_message_text("Aun se trabaja en el tema...",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose == '16'):
+      query.edit_message_text("Aun se trabaja en el tema...",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose == '17'):
+      query.edit_message_text("Aun se trabaja en el tema...",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose == '18'):
+      query.edit_message_text("Aun se trabaja en el tema...",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose == '19'):
+      query.edit_message_text("Aun se trabaja en el tema...",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose == '20'):
+      query.edit_message_text("Aun se trabaja en el tema...",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose == '21'):
+      query.edit_message_text("Aun se trabaja en el tema...",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose == '22'):
+      query.edit_message_text("Aun se trabaja en el tema...",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose == '23'):
+      query.edit_message_text("Aun se trabaja en el tema...",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose == '24'):
+      query.edit_message_text("Aun se trabaja en el tema...",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose == '25'):
+      query.edit_message_text("Aun se trabaja en el tema...",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose == '26'):
+      query.edit_message_text("Aun se trabaja en el tema...",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose == '27'):
+      query.edit_message_text("Aun se trabaja en el tema...",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose == '28'):
+      query.edit_message_text("Aun se trabaja en el tema...",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose == '29'):
+      query.edit_message_text("Aun se trabaja en el tema...",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose == '30'):
+      query.edit_message_text("Aun se trabaja en el tema...",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    if(choose == '31'):
+      query.edit_message_text("Aun se trabaja en el tema...",reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton('Regresar', callback_data='buyT')]]))
+    """
+      auxFechaI[2] = 1
+      new_date = datetime(auxFechaI[0], auxFechaI[1], auxFechaI[2], 00, 00, 00, 00000)
+      now = datetime.now()
+      now = now + timedelta(days=3)
+      print('entro2')
+      if now > new_date:
+        query.edit_message_text("Se tiene que reservar con dos dias de antelacion",
+                                   reply_markup=InlineKeyboardMarkup([
+                                                                      InlineKeyboardButton('Regresar', callback_data='buyT')]))
 
-###########################
-#Funcion que recibe texto 
-def input_text(update, context):                # metodo ingreso de texto
-  text = update.message.text                    # recibe el texto
-  if len(text)>0:
-    print("error")
-    update.message.reply_text("Lo siento no recibimos mensajes por texto.")
-  else:
-    print("ok")
-  print (text)
-  return ConversationHandler.END 
+    """                                                                                                                       
+    if( choose =='buyRT'):
+      auxBoleto[5]= '0'
+      query.edit_message_text('Elija el origen', reply_markup=InlineKeyboardMarkup([
+                                              [InlineKeyboardButton('Guayas', callback_data='guayasT'),#Crea el btn1 de Buscar
+                                              InlineKeyboardButton("Quito", callback_data='quitoT')], #Crea el btn2 Buscar
+                                              [InlineKeyboardButton("Regresar", callback_data='buscar') ], #Crea el btn3 de Buscar
+                                        ]),)
+##########################################
+    if choose == 'regresar':                          # Edita los botones que ya fueron creados y borra la informacion anterior
+      query.edit_message_text(text,reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton("Listar vuelos disponibles", callback_data='listar'),
+                                          InlineKeyboardButton("Buscar vuelo por origen y destino", callback_data='buscar')],
+                                          [InlineKeyboardButton("Finalizar", callback_data='finalizar')]]))
+    if choose == 'finalizar':
+      query.edit_message_text( "Gracias por elegirnos, tenga un excelente día.")
+##########################################
+def help_command(update: Update, _: CallbackContext) -> None:
+    update.message.reply_text("Usa /start para iniciar la reserva.")
 
 ###########################
 class Destino():
   def __init__(self):
-    # A continuacion se tiene una lista ['Lugar',Asiento,Tarifa extra] de lugares donde se puede ir       #Internacionales (56)
-    self.lista = [ ['Luanda, Angola ',0,0],['Argel, Argelia ',0,0],['Nairobi,Kenia ',0,0],['Antananarivo, Madagascar',0,0],['Buenos Aires, Argentina',0,0],        
-              ['Belmopán, Belice',0,0],['La Paz, Bolivia',0,0],['Brasilia, Brasil',0,0],['Ottawa, Canadá',0,0], ['Santiago de Chile, Chile',0,0],
-              ['Bogotá Colombia',0,0],['San José, Costa Rica',0,0],['La Habana, Cuba',0,0],['Roseau, Dominica',0,0],['San Salvador, El Salvador',0,0],  
-              ['Washingthon D.C, Estados Unidos',0,0],['Saunt George, Granada',0,0],['Ciudad de Guatemala, Guatemala',0,0],['Puerto Príncipe, Haití',0,0],
-              ['Tegucigalpa, Honduras',0,0],['Kingston, Jamaica',0,0],['Ciudad de México, México',0,0],['Panamá, Panamá',0,0],['Asunción, Paraguay',0,0], 
-              ['Managua, Nicaragua',0,0],['Montevideo, Uruguay',0,0],['Caracas, Venezuela',0,0],['Kabul, Afganistán',0,0],['Raid, Arabia Suadita',0,0], 
-              ['Pekín, China',0,0],['Nicosia, Chipre',0,0],['Pionyang, Corea del Norte',0,0],['Seúl, Corea del Sur',0,0],['Manila, Filipinas',0,0], 
-              ['Lima, Perú',0,0],['Tokio, Japón',0,0],['Jerusalén, Israel',0,0],['Beirut, Líbano',0,0],['Ulán Bator, Mongolia',0,0],['Ankara, Turquía',0,0], 
-              ['BangKok, Tailandia',0,0],['Hanói, Vietnam',0,0],['Berlín, Alemania',0,0],['Brusela, Bélgica',0,0],['Zagreb, Croacia',0,0],  
-              ['Copenhague, Dinamarca',0,0],['Madrid, España',0,0],['Helsinhi, Filandia',0,0],['París, Francia',0,0],['Atenas, Grecia',0,0],  
-              ['Dublín, Irlanda',0,0],['Roma, Italia',0,0],['Estocolmo, Suecia',0,0],['Berma, Suiza',0,0],['Muscú, Rusia',0,0],['Canberra, Australia',0,0],
-              ['Morona Santiago, Ecuador',0,0],['Loja, Ecuador',0,0],['Zamora Chinchipe, Ecuador',0,0],['Pastaza, Ecuador',0,0],                #Nacionales (12)                                                     
-              ['Sucumbíos, Ecuador',0,0],['Galápagos, Ecuador',0,0],['Orellana, Ecuador',0,0],['Salinas, Ecuador',0,0],                         #Total de destino = (68)
-              ['Esmeralda, Ecuador',0,0],['Latacunga, Ecuador',0,0],['Manabí, Ecuador',0,0],['Guayas, Ecuador',0,0]]
-
+    # A continuacion se tiene una lista ['Lugar',Asiento,Tarifa extra] de lugares donde se puede ir                          # ----Internacionales---#(57)
+    self.lista = [ ['Luanda, Angola ',0,0],['Argel, Argelia ',0,0],['Nairobi,Kenia ',0,0],['Antananarivo, Madagascar',0,0],         # ----Africa---- # (4)
+                  ['Buenos Aires, Argentina',0,0],['Belmopán, Belice',0,0],['La Paz, Bolivia',0,0],['Brasilia, Brasil',0,0],        # ----America--- # 
+                  ['Ottawa, Canadá',0,0], ['Santiago de Chile, Chile',0,0], ['Bogotá Colombia',0,0],['San José, Costa Rica',0,0],
+                  ['La Habana, Cuba',0,0],['Roseau, Dominica',0,0],['San Salvador, El Salvador',0,0],['Washingthon D.C, Estados Unidos',0,0],
+                  ['Saunt George, Granada',0,0],['Ciudad de Guatemala, Guatemala',0,0],['Puerto Príncipe, Haití',0,0], ['Tegucigalpa, Honduras',0,0],
+                  ['Kingston, Jamaica',0,0],['Ciudad de México, México',0,0],['Panamá, Panamá',0,0],['Asunción, Paraguay',0,0],                       
+                  ['Managua, Nicaragua',0,0],['Montevideo, Uruguay',0,0],['Caracas, Venezuela',0,0],['Lima, Perú',0,0],             # ----America---- #(24)                              
+                  ['Kabul, Afganistán',0,0],['Raid, Arabia Suadita',0,0],['Pekín, China',0,0],['Nicosia, Chipre',0,0],              # ----Asia---- #
+                  ['Pionyang, Corea del Norte',0,0],['Seúl, Corea del Sur',0,0],['Manila, Filipinas',0,0], ['Tokio, Japón',0,0],
+                  ['Jerusalén, Israel',0,0],['Beirut, Líbano',0,0],['Ulán Bator, Mongolia',0,0],['Ankara, Turquía',0,0], 
+                  ['BangKok, Tailandia',0,0],['Hanói, Vietnam',0,0],                                                                # ----Asia---- #(14)
+                  ['Berlín, Alemania',0,0],['Brusela, Bélgica',0,0],['Zagreb, Croacia',0,0],['Copenhague, Dinamarca',0,0],          # ----Europa--- #
+                  ['Madrid, España',0,0],['Helsinhi, Filandia',0,0], ['París, Francia',0,0],['Atenas, Grecia',0,0],
+                  ['Dublín, Irlanda',0,0],['Roma, Italia',0,0],['Estocolmo, Suecia',0,0],['Berma, Suiza',0,0],['Muscú, Rusia',0,0], # ----Europa--- #(13)
+                  ['Canberra, Australia',0,0],['Wellington, Nueva Zelanda',0,0],                                                    # ----Oceania--- #(2)
+                  ['Morona Santiago, Ecuador',0,0],['Loja, Ecuador',0,0],['Zamora Chinchipe, Ecuador',0,0],['Pastaza, Ecuador',0,0],#----Nacionales--- #                
+                  ['Sucumbíos, Ecuador',0,0],['Galápagos, Ecuador',0,0],['Manabí, Ecuador',0,0],['Salinas, Ecuador',0,0],           
+                  ['Esmeralda, Ecuador',0,0],['Latacunga, Ecuador',0,0],['Quito,Ecuador',0,0],['Guayas, Ecuador',0,0]]           #----Nacionales--- #(12)
+    print(len(self.lista))
   def llenarBD(self):                       # este metodo llena la lista de las ciudades de destino 
     for x in range(0,len(self.lista)):      # recorre la lista como erch-for 
-      asiento = randint(0,20)               # creo numeros aleatorios para el total de asientos de un avion
-      costo = randint(100,500)              # son las tarifas extras que cuestan cada ciudad
+      asiento = randint(0,40)               # creo numeros aleatorios para el total de asientos de un avion
+      costo = randint(600,1000)              # son las tarifas extras que cuestan cada ciudad
       self.lista[x][1]= asiento             # Guardo la informacion en la lista
       self.lista[x][2] = costo              # Guardo la informacion en la lista
-                                                                                                                                               
+      
 ###########################
 class Origen():
   def __init__(self,nombre,ciudad):
@@ -95,54 +1419,39 @@ class Origen():
     self.nombre = nombre
     self.ciudad = ciudad
     self.pais = 'Ecuador '
-    self.costo = 700
+    #self.costo = 700
     self.destino = Destino()
-
+"""
 origen = [ ['Coronel Edmundo carvajal','Morona Santiago'],['Ciudad de Catamayo','Loja'],['de Cumbaratza','Zamora Chinchipe'],['de Curaray','Pastaza'],   
           ['Nueva Loja','Sucumbíos'],['de San Cristóbal','Galápagos'],['Francisco de Orellana','Orellana'],['General Ulpiano Paez','Salinas'],
-          ['Coronel Carlos Concha Torres','Esmeraldaa'],['Cotopaxi','Latacunga'],['Eloy Alfaro','Manabí'],['José Joaquín de Olmedo','Guayas']]
+          ['Coronel Carlos Concha Torres','Esmeralda'],['Cotopaxi','Latacunga'],['Eloy Alfaro','Manabí'],['José Joaquín de Olmedo','Guayas']]
+"""
+origen =[['José Joaquín de Olmedo','Guayas'],['Mariscal de sucre','Quito']]
 
-for x in range(0,len(VUELO)):
-  VUELO[x] = Origen(origen[x][0],origen[x][1])      #Instanciando los objetos Origen(nombre,ciudad)
-  VUELO[x].destino.llenarBD()
+for x in range(0,len(VIAJE)):
+  VIAJE[x] = Origen(origen[x][0],origen[x][1])      #Instanciando los objetos Origen(nombre,ciudad)
+  VIAJE[x].destino.llenarBD()
+"""
+for x in range(0,len(VIAJE)):
+  print(VIAJE[x].edificio+' '+VIAJE[x].nombre + ','+ VIAJE[x].ciudad+ '-'+ VIAJE[x].pais)
+  print(VIAJE[x].destino.lista)
+"""
+##########################################
+def main() -> None:
+    # Create the Updater and pass it your bot's token.
+    updater = Updater("1694478909:AAEK2bQeVpEuG961ibFH56tacOL1t265ntg")
 
-for x in range(0,len(VUELO)):
-  print(VUELO[x].edificio+' '+VUELO[x].nombre + ','+ VUELO[x].ciudad+ '-'+ VUELO[x].pais)
-  print(VUELO[x].destino.lista)
+    updater.dispatcher.add_handler(CommandHandler('start', start))
+    updater.dispatcher.add_handler(CallbackQueryHandler(button)) # Controla los botones
+    updater.dispatcher.add_handler(CommandHandler('help', help_command))
 
-###########################
+    # Start the Bot
+    updater.start_polling()
 
-def main():  
-              
-  # Crear el manejador de eventos a partir del TOKEN del bot
-  updater = Updater(token='1694478909:AAEK2bQeVpEuG961ibFH56tacOL1t265ntg' , use_context=True) 
+    # Ejecute el bot hasta que el usuario presione Ctrl-C o el proceso reciba SIGINT,
+    # SIGTERM o SIGABRT
+    updater.idle()
 
-  # Obtener el registro de manejadores del planificador
-  dp = updater.dispatcher                
-                     
-  # Obtener el registro de manejadores del planificador 
-  dp.add_handler(CommandHandler('start',start)) 
-  
-  # Obtener el registro de manejadores del planificador de los botones
-  dp.add_handler(ConversationHandler(
-      entry_points=[
-                    CallbackQueryHandler(pattern='search', callback = btnBuscar),
-      ],
-      states = {INPUT_TEXT:[MessageHandler(Filters.text,input_text)]},fallbacks=[]
-  ))
-
-  dp.add_handler(ConversationHandler(
-      entry_points=[
-                    CallbackQueryHandler(pattern='return', callback = btnReturn)
-      ],
-      states = {INPUT_TEXT:[MessageHandler(Filters.text,input_text)]},fallbacks=[]
-  ))
-
-  # Iniciamos el bot
-  updater.start_polling()
- 
-  # Actualizamos el estado del bot (bloquea la ejecucion a la espera de mensajes)
-  updater.idle()
-
-####### Principal #######
-if __name__ == '__main__': 
+##########################################
+if __name__ == '__main__':
+    main()
