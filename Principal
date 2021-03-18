@@ -1,0 +1,148 @@
+Version1
+#Proyecto
+# libreirias
+import os
+import qrcode
+import time
+from telegram.ext import  Updater, CommandHandler, ConversationHandler,CallbackQueryHandler, MessageHandler, Filters
+from telegram import ChatAction, InlineKeyboardMarkup, InlineKeyboardButton
+from random import randint, randrange
+from time import sleep 
+###########################
+# Constantes del programa
+INPUT_TEXT =0
+VUELO = [0,0,0,0,0,0,0,0,0,0,0,0]
+
+###########################
+#Funcion para el comando /start
+def start(update, context):                     #metodo que envia un mensaje cuando inicia el bot con el comando (/start).
+  update.message.reply_text(text='Bienvenid@! Para reservar su vuelo elija una de esta opciones: ', 
+                            reply_markup=InlineKeyboardMarkup([
+                                                               [InlineKeyboardButton(text='Listar vuelos disponibles', callback_data='list')], #Crea el btn1
+                                                               [InlineKeyboardButton(text='Buscar vuelo por origen y destino', callback_data='search')], 
+                                                               ])) #Crea el btn2  # Devuelve esta respuesta. Añade uno a debajo del otro
+
+###########################
+#Funcion para el boton Search 
+def btnBuscar(update, context): 
+  query=update.callback_query
+  query.answer()
+  query.edit_message_text(                        # Edita los botones que ya fueron creados y borra la informacion anterior
+      text ='Elija unas de las siguintes opciones',
+      reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(text='Reservar vuelo solo ida', callback_data='buyT'),#Crea el btn1 de Buscar
+                                          InlineKeyboardButton(text='Reservar vuelo ida y vuelta', callback_data='buyRT')], #Crea el btn2 Buscar
+                                         [InlineKeyboardButton(text='Regresar', callback_data='return') ], #Crea el btn3 de Buscar
+                                        ]))
+  return INPUT_TEXT                               #Hace que espere alguna respuesta
+
+###########################
+#Funcion para el boton return 
+def btnReturn(update, context): 
+  query=update.callback_query
+  query.answer()
+  query.edit_message_text(
+      text = 'Para reservar su vuelo elija una de esta opciones: ', 
+      reply_markup=InlineKeyboardMarkup([
+                                         [InlineKeyboardButton(text='Listar vuelos disponibles', callback_data='list')], #reCrea el btn1 
+                                         [InlineKeyboardButton(text='Buscar vuelo por origen y destino', callback_data='search')], #reCrea el btn2
+                                          ])
+  )
+  return INPUT_TEXT
+
+###########################
+#Funcion que recibe texto 
+def input_text(update, context):                # metodo ingreso de texto
+  text = update.message.text                    # recibe el texto
+  if len(text)>0:
+    print("error")
+    update.message.reply_text("Lo siento no recibimos mensajes por texto.")
+  else:
+    print("ok")
+  print (text)
+  return ConversationHandler.END 
+
+###########################
+class Destino():
+  def __init__(self):
+    # A continuacion se tiene una lista ['Lugar',Asiento,Tarifa extra] de lugares donde se puede ir       #Internacionales (56)
+    self.lista = [ ['Luanda, Angola ',0,0],['Argel, Argelia ',0,0],['Nairobi,Kenia ',0,0],['Antananarivo, Madagascar',0,0],['Buenos Aires, Argentina',0,0],        
+              ['Belmopán, Belice',0,0],['La Paz, Bolivia',0,0],['Brasilia, Brasil',0,0],['Ottawa, Canadá',0,0], ['Santiago de Chile, Chile',0,0],
+              ['Bogotá Colombia',0,0],['San José, Costa Rica',0,0],['La Habana, Cuba',0,0],['Roseau, Dominica',0,0],['San Salvador, El Salvador',0,0],  
+              ['Washingthon D.C, Estados Unidos',0,0],['Saunt George, Granada',0,0],['Ciudad de Guatemala, Guatemala',0,0],['Puerto Príncipe, Haití',0,0],
+              ['Tegucigalpa, Honduras',0,0],['Kingston, Jamaica',0,0],['Ciudad de México, México',0,0],['Panamá, Panamá',0,0],['Asunción, Paraguay',0,0], 
+              ['Managua, Nicaragua',0,0],['Montevideo, Uruguay',0,0],['Caracas, Venezuela',0,0],['Kabul, Afganistán',0,0],['Raid, Arabia Suadita',0,0], 
+              ['Pekín, China',0,0],['Nicosia, Chipre',0,0],['Pionyang, Corea del Norte',0,0],['Seúl, Corea del Sur',0,0],['Manila, Filipinas',0,0], 
+              ['Lima, Perú',0,0],['Tokio, Japón',0,0],['Jerusalén, Israel',0,0],['Beirut, Líbano',0,0],['Ulán Bator, Mongolia',0,0],['Ankara, Turquía',0,0], 
+              ['BangKok, Tailandia',0,0],['Hanói, Vietnam',0,0],['Berlín, Alemania',0,0],['Brusela, Bélgica',0,0],['Zagreb, Croacia',0,0],  
+              ['Copenhague, Dinamarca',0,0],['Madrid, España',0,0],['Helsinhi, Filandia',0,0],['París, Francia',0,0],['Atenas, Grecia',0,0],  
+              ['Dublín, Irlanda',0,0],['Roma, Italia',0,0],['Estocolmo, Suecia',0,0],['Berma, Suiza',0,0],['Muscú, Rusia',0,0],['Canberra, Australia',0,0],
+              ['Morona Santiago, Ecuador',0,0],['Loja, Ecuador',0,0],['Zamora Chinchipe, Ecuador',0,0],['Pastaza, Ecuador',0,0],                #Nacionales (12)                                                     
+              ['Sucumbíos, Ecuador',0,0],['Galápagos, Ecuador',0,0],['Orellana, Ecuador',0,0],['Salinas, Ecuador',0,0],                         #Total de destino = (68)
+              ['Esmeralda, Ecuador',0,0],['Latacunga, Ecuador',0,0],['Manabí, Ecuador',0,0],['Guayas, Ecuador',0,0]]
+
+  def llenarBD(self):                       # este metodo llena la lista de las ciudades de destino 
+    for x in range(0,len(self.lista)):      # recorre la lista como erch-for 
+      asiento = randint(0,20)               # creo numeros aleatorios para el total de asientos de un avion
+      costo = randint(100,500)              # son las tarifas extras que cuestan cada ciudad
+      self.lista[x][1]= asiento             # Guardo la informacion en la lista
+      self.lista[x][2] = costo              # Guardo la informacion en la lista
+                                                                                                                                               
+###########################
+class Origen():
+  def __init__(self,nombre,ciudad):
+    self.edificio = 'Aeropuerto '
+    self.nombre = nombre
+    self.ciudad = ciudad
+    self.pais = 'Ecuador '
+    self.costo = 700
+    self.destino = Destino()
+
+origen = [ ['Coronel Edmundo carvajal','Morona Santiago'],['Ciudad de Catamayo','Loja'],['de Cumbaratza','Zamora Chinchipe'],['de Curaray','Pastaza'],   
+          ['Nueva Loja','Sucumbíos'],['de San Cristóbal','Galápagos'],['Francisco de Orellana','Orellana'],['General Ulpiano Paez','Salinas'],
+          ['Coronel Carlos Concha Torres','Esmeraldaa'],['Cotopaxi','Latacunga'],['Eloy Alfaro','Manabí'],['José Joaquín de Olmedo','Guayas']]
+
+for x in range(0,len(VUELO)):
+  VUELO[x] = Origen(origen[x][0],origen[x][1])      #Instanciando los objetos Origen(nombre,ciudad)
+  VUELO[x].destino.llenarBD()
+
+for x in range(0,len(VUELO)):
+  print(VUELO[x].edificio+' '+VUELO[x].nombre + ','+ VUELO[x].ciudad+ '-'+ VUELO[x].pais)
+  print(VUELO[x].destino.lista)
+
+###########################
+
+def main():  
+              
+  # Crear el manejador de eventos a partir del TOKEN del bot
+  updater = Updater(token='1694478909:AAEK2bQeVpEuG961ibFH56tacOL1t265ntg' , use_context=True) 
+
+  # Obtener el registro de manejadores del planificador
+  dp = updater.dispatcher                
+                     
+  # Obtener el registro de manejadores del planificador 
+  dp.add_handler(CommandHandler('start',start)) 
+  
+  # Obtener el registro de manejadores del planificador de los botones
+  dp.add_handler(ConversationHandler(
+      entry_points=[
+                    CallbackQueryHandler(pattern='search', callback = btnBuscar),
+      ],
+      states = {INPUT_TEXT:[MessageHandler(Filters.text,input_text)]},fallbacks=[]
+  ))
+
+  dp.add_handler(ConversationHandler(
+      entry_points=[
+                    CallbackQueryHandler(pattern='return', callback = btnReturn)
+      ],
+      states = {INPUT_TEXT:[MessageHandler(Filters.text,input_text)]},fallbacks=[]
+  ))
+
+  # Iniciamos el bot
+  updater.start_polling()
+ 
+  # Actualizamos el estado del bot (bloquea la ejecucion a la espera de mensajes)
+  updater.idle()
+
+####### Principal #######
+if __name__ == '__main__': 
